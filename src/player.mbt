@@ -237,12 +237,21 @@ fn player_state_system(backend : &@system.Backend) -> Unit {
           transform~,
         )
       }
-      if @system.is_pressed(@system.KeyW) &&
+      // 只允许W键松开后再按下才跳跃
+      if !@system.is_pressed(@system.KeyW) {
+        game_state.jump_key_released = true
+      }
+      if @system.is_pressed(@system.KeyW) && game_state.jump_key_released &&
         @collision.is_on_floor(game_state.player) {
         new_velocity_y = -JUMP_V
         game_state.player_state = PlayerState::Jump
+        game_state.jump_key_released = false
       }
-      if @system.is_just_pressed(@system.KeyJ) {
+      // 鼠标左键攻击，松开后才能再次攻击
+      if !@system.is_mouse_pressed(@system.MouseButton::Left) {
+        game_state.mouse_left_released = true
+      }
+      if @system.is_mouse_pressed(@system.MouseButton::Left) && game_state.mouse_left_released {
         game_state.player_state = PlayerState::Attack
         @sprite.play_animation(
           game_state.player,
@@ -250,6 +259,7 @@ fn player_state_system(backend : &@system.Backend) -> Unit {
           transform~,
         )
         new_velocity_x = 0.0
+        game_state.mouse_left_released = false
       }
       if velocity.0[Y] > 0.0 {
         game_state.player_state = PlayerState::Fall
@@ -311,42 +321,47 @@ fn player_state_system(backend : &@system.Backend) -> Unit {
         transform~,
       )
       // 攻击状态下移动速度惩罚加重为九成（仅剩一成速度），跳跃不会打断攻击，只播放攻击动画
-      if @system.is_pressed(@system.KeyA) {
-        new_velocity_x = -MAX_RUN_V * 0.1
-        game_state.direction = Direction2::Left
-      } else if @system.is_pressed(@system.KeyD) {
-        new_velocity_x = MAX_RUN_V * 0.1
-        game_state.direction = Direction2::Right
-      } else {
-        new_velocity_x = 0.0
-      }
-      // 攻击时允许跳跃产生垂直位移，但不切换动画，且跳跃会结束Dash状态
-      if @system.is_pressed(@system.KeyW) && @collision.is_on_floor(game_state.player) {
-        new_velocity_y = -JUMP_V
-        if game_state.player_state is Dash {
-          game_state.player_state = PlayerState::Jump
-        }
-      }
-      // 重力和下落
-      new_velocity_y += GRAVITY
-      if new_velocity_y > MAX_FALL_V {
-        new_velocity_y = MAX_FALL_V
-      }
-      // 攻击期间按空格不会Dash
-      if @system.is_just_pressed(@system.Space) {
-        if game_state.player_state is Dash {
-          game_state.player_state = PlayerState::Idle
-        }
-      }
-      if @sprite.is_animation_finished(game_state.player) {
-        if @collision.is_on_floor(game_state.player) {
-          game_state.player_state = PlayerState::Idle
-        } else if new_velocity_y > 0.0 {
-          game_state.player_state = PlayerState::Fall
+        // 攻击状态下不再有移动速度惩罚，空中也可攻击
+        if @system.is_pressed(@system.KeyA) {
+          new_velocity_x = -MAX_RUN_V
+          game_state.direction = Direction2::Left
+        } else if @system.is_pressed(@system.KeyD) {
+          new_velocity_x = MAX_RUN_V
+          game_state.direction = Direction2::Right
         } else {
-          game_state.player_state = PlayerState::Jump
+          new_velocity_x = 0.0
         }
-      }
+        // 攻击时允许跳跃产生垂直位移，但需松开再按下W才跳跃
+        if !@system.is_pressed(@system.KeyW) {
+          game_state.jump_key_released = true
+        }
+        if @system.is_pressed(@system.KeyW) && game_state.jump_key_released && @collision.is_on_floor(game_state.player) {
+          new_velocity_y = -JUMP_V
+          if game_state.player_state is Dash {
+            game_state.player_state = PlayerState::Jump
+          }
+          game_state.jump_key_released = false
+        }
+        // 重力和下落
+        new_velocity_y += GRAVITY
+        if new_velocity_y > MAX_FALL_V {
+          new_velocity_y = MAX_FALL_V
+        }
+        // 攻击期间按空格不会Dash
+        if @system.is_just_pressed(@system.Space) {
+          if game_state.player_state is Dash {
+            game_state.player_state = PlayerState::Idle
+          }
+        }
+        if @sprite.is_animation_finished(game_state.player) {
+          if @collision.is_on_floor(game_state.player) {
+            game_state.player_state = PlayerState::Idle
+          } else if new_velocity_y > 0.0 {
+            game_state.player_state = PlayerState::Fall
+          } else {
+            game_state.player_state = PlayerState::Jump
+          }
+        }
     }
     Dash => {
       @sprite.play_animation(

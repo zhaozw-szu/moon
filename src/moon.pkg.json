@@ -12,6 +12,8 @@
     "Milky2018/selene/tilemap",
     "Milky2018/selene/camera",
     "Milky2018/selene/ui",
-    { "path": "Milky2018/selene-canvas", "alias": "canvas" }
+    { 
+      "path": "Milky2018/selene-canvas", "alias": "canvas"
+    }
   ]
 }
